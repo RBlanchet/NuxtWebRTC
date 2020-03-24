@@ -28,9 +28,34 @@ async function start () {
   const httpServer = createServer(app);
   const io = socketIo(httpServer);
 
+  let activeSockets = [];
   io.on('connection', socket => {
-    console.log('Socket connecté');
+    const existingSocket = activeSockets.find(activeSocket => activeSocket === socket.id);
+
+    if (!existingSocket) {
+      activeSockets.push(socket.id);
+
+      // Emet à tous les utilisateurs de la liste des socket actifs
+      socket.emit('UPDATE_USERS_LIST', {
+        users: activeSockets.filter(activeSocket => activeSocket !== socket.id),
+      });
+
+      // Emet à tous le monde sauf celui qui se connecte de la connexion de l'utilisateur
+      socket.broadcast.emit('UPDATE_USERS_LIST', {
+        users: [socket.id],
+      });
+    }
+
+    socket.on('disconnect', () => {
+      // Lorsqu'un Socket se désactive, on supprime l'utilisateur de la liste et on l'emet
+      activeSockets = activeSockets.filter(activeSocket => activeSocket !== socket.id);
+      socket.broadcast.emit("REMOVE_USER", {
+        user: socket.id,
+      });
+    });
   });
+
+
 
   // Listen the server
   httpServer.listen(port, host);

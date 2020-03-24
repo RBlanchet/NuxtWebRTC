@@ -1,27 +1,45 @@
 <template>
-  <div class="container">
-    <h1 class="text-center">NuxtWebRTC</h1>
-    <div class="rounded overflow-hidden shadow-lg flex justify-center">
-      <video autoplay ref="localVideo"></video>
-    </div>
+  <div class="flex justify-center flex-col items-center">
+    <Video :stream="localStream" titre="Vidéo locale"/>
+    <Video :stream="remote.stream" :titre="remote.titre" v-for="remote in remotesStream" :key="remote.socket"/>
   </div>
 </template>
 
 <script>
-export default {
-  mounted() {
-    navigator.getUserMedia(
-      { video: true, audio: true },
-      stream => {
-        const localVideo = this.$refs['localVideo'];
-        if (localVideo) {
-          localVideo.srcObject = stream;
-        }
-      },
-      error => {
-        console.warn(error.message);
+  import Video from '../components/Video';
+  import io from 'socket.io-client';
+
+  export default {
+    data() {
+      return {
+        localStream: null,
+        socket: io('localhost:3000'),
+        remotesStream: [],
       }
-    );
+    },
+    components: {
+      Video,
+    },
+    async mounted() {
+      this.socket.on('UPDATE_USERS_LIST', ({users}) => {
+        users.forEach(user => {
+          this.remotesStream.push({
+            stream: new MediaStream(),
+            titre: user,
+            socket: user,
+          });
+        });
+      });
+
+      this.socket.on('REMOVE_USER', ({user}) => {
+        this.remotesStream = this.remotesStream.filter(remote => remote.socket !== user);
+      });
+
+      this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+
+      this.socket.emit('LOCAL_VIDEO_CONNECTED', {
+        stream: this.localStream,
+      });
+    },
   }
-}
 </script>
