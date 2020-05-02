@@ -1,77 +1,45 @@
 <template>
-  <div class="container">
-    <div>
-      <logo />
-      <h1 class="title">
-        NuxtWebRTC
-      </h1>
-      <h2 class="subtitle">
-        Application de Chat vidéo sous Nuxt
-      </h2>
-      <div class="links">
-        <a
-          href="https://nuxtjs.org/"
-          target="_blank"
-          class="button--green"
-        >
-          Documentation
-        </a>
-        <a
-          href="https://github.com/nuxt/nuxt.js"
-          target="_blank"
-          class="button--grey"
-        >
-          GitHub
-        </a>
-      </div>
-    </div>
+  <div class="flex justify-center flex-col items-center">
+    <Video :stream="localStream" titre="Vidéo locale"/>
+    <Video :stream="remote.stream" :titre="remote.titre" v-for="remote in remotesStream" :key="remote.socket"/>
   </div>
 </template>
 
 <script>
-import Logo from '~/components/Logo.vue'
+  import Video from '../components/Video';
+  import io from 'socket.io-client';
 
-export default {
-  components: {
-    Logo
+  export default {
+    data() {
+      return {
+        localStream: null,
+        socket: io('localhost:3000'),
+        remotesStream: [],
+      }
+    },
+    components: {
+      Video,
+    },
+    async mounted() {
+      this.socket.on('UPDATE_USERS_LIST', ({users}) => {
+        users.forEach(user => {
+          this.remotesStream.push({
+            stream: new MediaStream(),
+            titre: user,
+            socket: user,
+          });
+        });
+      });
+
+      this.socket.on('REMOVE_USER', ({user}) => {
+        this.remotesStream = this.remotesStream.filter(remote => remote.socket !== user);
+      });
+
+      this.localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+
+      this.socket.emit('LOCAL_VIDEO_CONNECTED', {
+        stream: this.localStream,
+      });
+    },
   }
-}
 </script>
-
-<style>
-/* Sample `apply` at-rules with Tailwind CSS
-.container {
-  @apply min-h-screen flex justify-center items-center text-center mx-auto;
-}
-*/
-.container {
-  margin: 0 auto;
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-}
-
-.title {
-  font-family: 'Quicksand', 'Source Sans Pro', -apple-system, BlinkMacSystemFont,
-    'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  display: block;
-  font-weight: 300;
-  font-size: 100px;
-  color: #35495e;
-  letter-spacing: 1px;
-}
-
-.subtitle {
-  font-weight: 300;
-  font-size: 42px;
-  color: #526488;
-  word-spacing: 5px;
-  padding-bottom: 15px;
-}
-
-.links {
-  padding-top: 15px;
-}
-</style>
